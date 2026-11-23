@@ -1,11 +1,11 @@
-version: '2'
 services:
   influxdb:
-    image: influxdb:latest
+    image: influxdb:2
     ports:
       - '8086:8086'
     volumes:
-      - influxdb-storage:/var/lib/influxdb
+      - influxdb-storage:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
       - ./influxDB-scripts:/docker-entrypoint-initdb.d
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
@@ -18,6 +18,13 @@ services:
       - V1_RP_NAME=${V1_RP_NAME}
       - V1_AUTH_USERNAME=${V1_AUTH_USERNAME}
       - V1_AUTH_PASSWORD=${V1_AUTH_PASSWORD}
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   chronograf:
     image: chronograf:latest
     ports:
@@ -25,11 +32,13 @@ services:
     volumes:
       - chronograf-storage:/var/lib/chronograf
     depends_on:
-      - influxdb
+      influxdb:
+        condition: service_healthy
     environment:
       - INFLUXDB_URL=http://influxdb:8086
       - INFLUXDB_USERNAME=${INFLUXDB_USERNAME}
       - INFLUXDB_PASSWORD=${INFLUXDB_PASSWORD}
+
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -38,7 +47,8 @@ services:
       - grafana-storage:/var/lib/grafana
       - ./grafana-provisioning/:/etc/grafana/provisioning/
     depends_on:
-      - influxdb
+      influxdb:
+        condition: service_healthy
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USERNAME}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
@@ -48,7 +58,9 @@ services:
       - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
       - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_ADMIN_TOKEN}
+
 volumes:
   influxdb-storage:
+  influxdb-config:
   chronograf-storage:
   grafana-storage:
